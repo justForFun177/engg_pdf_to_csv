@@ -8,7 +8,7 @@ import tabula
 import re
 import warnings
 warnings.filterwarnings("ignore", category=SyntaxWarning, message=r"invalid escape sequence.*")
-
+st.set_page_config(page_title="PDF to EXCEL")
 st.title("UPLOAD ENGINEERING RESULT PDF")
 
 try:
