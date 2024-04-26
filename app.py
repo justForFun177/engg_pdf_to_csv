@@ -1,4 +1,5 @@
 import streamlit as st
+import copy
 import pandas as pd
 from io import StringIO
 import io
@@ -13,6 +14,7 @@ st.title("UPLOAD ENGINEERING RESULT PDF")
 pdf = st.file_uploader("UPLOAD A FILE")
 
 if pdf:
+    pdf2 = copy.copy(pdf)
     check_table = tabula.read_pdf(pdf, pages="3-10", multiple_tables=True)
     name_pattern = r'Name:\s*([\w\s]+)'
     prn_pattern = r'PRN:\s*(\d+)'
@@ -25,7 +27,7 @@ if pdf:
             break
 
     if flag==1:
-        tables = tabula.read_pdf(pdf, pages="all", multiple_tables=True)
+        tables = tabula.read_pdf(pdf2, pages="all", multiple_tables=True)
 
         name_pattern = r'Name:\s*([\w\s]+)'
         prn_pattern = r'PRN:\s*(\d+)'
