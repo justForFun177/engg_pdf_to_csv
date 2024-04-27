@@ -5,7 +5,6 @@ from io import StringIO
 import io
 import pdfplumber
 import processEnggResult
-import tabula
 import re
 import warnings
 
