@@ -5,6 +5,7 @@ import PyPDF2
 from io import StringIO
 import io
 import tabula
+import pdfplumber
 
 def get_ese_marks(singlePage, sem: int, sub: int):
     # abb for Abbreviations
@@ -397,104 +398,96 @@ def extract_data_from_pdf(file):
 
 
 def format2(pdf):
-    tables = tabula.read_pdf(pdf, pages="all", multiple_tables=True)
 
-    name_pattern = r'Name:\s*([\w\s]+)'
-    prn_pattern = r'PRN:\s*(\d+)'
-    seat_pattern = r'Seat No:\s*(\d+)'
-    total_credit_pattern = r'Total Credit:\s*(\d+)'
-    egp_pattern = r'EGP:\s*([\d.]+)'
-    sgpa_pattern = r'SGPA:\s*([\d.]+)'
-    status_pattern = r'Status:\s*([\w]+)'
-    percentage_pattern = r'Percentage:\s*([\d.]+)\s*%'
+    tables = []
+    with pdfplumber.open(pdf) as pdf:
+        for page in pdf.pages:
+            table = page.extract_tables()
+            tables.extend(table)
 
-    a = ["Exam Seat No.", "PRN No.", "Name of Student"] + ["BTN06301"] * 6 + ["BTN06302"] * 6 + ["BTN06303"] * 6 + ["BTN06304"] * 6 + ["BTN06305"] * 6 + [
-        "BTN06306"] * 6 + [""] * 5
-    b = ["", "", ""] + "ESE	ISE	ICA	POE	Total Sts".split() * 6 + [
-        "Total Credit", "EGP", "SGPA", "Status", "Percentage"]
-    c = pd.DataFrame(columns=[a,b])
+    # Combine all tables into a single dataframe
+    combined_table = None
+    for table in tables:
+        if combined_table is None:
+            combined_table = table
+        else:
+            combined_table.extend(table)
+
+
+    result = []
+    for i in range(1, len(tables[0])):
+        if "BTN" in tables[0][i][0]:
+            result.append(tables[0][i][0])
+        else:
+            break
+    subjectCode = sorted(list(set(result)))
+
+    header = ["Exam Seat No.", "PRN No.", "Name of Student"]
+    for i in subjectCode:
+        for j in range(6):
+            header.append(i)
+    header.append("Total Credit")
+    header.append("EGP")
+    header.append("SGPA")
+    header.append("Status")
+    header.append("Percentage")
+    b = ["", "", ""] + "ESE	ISE	ICA	POE	Total Sts".split() * len(
+        subjectCode) + ["", "", "", "", ""]
+    c = pd.DataFrame(columns=[header,b])
 
     index = 0
-    for i in range(len(tables) - 1):
-        pattern = tables[i].columns[0]
-        if re.search(name_pattern, pattern) and re.search(prn_pattern, pattern) and re.search(seat_pattern, pattern):
-            # Search for matches using regex
-            name_match = re.search(name_pattern, pattern)
-            prn_match = re.search(prn_pattern, pattern)
-            seat_match = re.search(seat_pattern, pattern)
 
-            # Extract information if matches are found, else assign empty strings
-            name = name_match.group(1) # if name_match else ''
-            prn = prn_match.group(1) #if prn_match else ''
-            seat_no = seat_match.group(1) #if seat_match else ''
+    for i in range(3, len(tables)):
+        text = tables[i][0][0]
+        seat_match = re.search(r'SeatNo:(\d+)', text)
+        seat_match2 = re.search(r'Seat No:\s*(\d+)', text)
+        prn_match = re.search(r'PRN:\s*(\d+)', text)
+        name_match = re.search(r'Name:\s*([\w\s]+)', text)
 
-            c.at[index, 'Exam Seat No.'] = seat_no
-            c.at[index, 'PRN No.'] = prn
-            c.at[index, 'Name of Student'] = name
-            print(i)
-            c.iloc[index, 3] = tables[i].iloc[1, 3]
-            c.iloc[index, 4] = tables[i].iloc[1, 5]
-            c.iloc[index, 5] = tables[i].iloc[1, 7]
-            c.iloc[index, 6] = tables[i].iloc[1, 9]
-            c.iloc[index, 7] = tables[i].iloc[1, 12]
-            c.iloc[index, 8] = tables[i].iloc[1, 16]
+        seat_no = seat_match.group(1) if seat_match else seat_match2.group(1)
+        prn = prn_match.group(1) if prn_match else None
+        name = name_match.group(1) if name_match else None
 
-            c.iloc[index, 9] = tables[i].iloc[3, 3]
-            c.iloc[index, 10] = tables[i].iloc[3, 5]
-            c.iloc[index, 11] = tables[i].iloc[3, 7]
-            c.iloc[index, 12] = tables[i].iloc[3, 9]
-            c.iloc[index, 13] = tables[i].iloc[3, 12]
-            c.iloc[index, 14] = tables[i].iloc[3, 16]
+        c.at[index, 'Exam Seat No.'] = seat_no
+        c.at[index, 'PRN No.'] = prn
+        c.at[index, 'Name of Student'] = name
 
-            c.iloc[index, 15] = tables[i].iloc[6, 3]
-            c.iloc[index, 16] = tables[i].iloc[6, 5]
-            c.iloc[index, 17] = tables[i].iloc[6, 7]
-            c.iloc[index, 18] = tables[i].iloc[6, 9]
-            c.iloc[index, 19] = tables[i].iloc[6, 12]
-            c.iloc[index, 20] = tables[i].iloc[6, 16]
+        codes = subjectCode.copy()
+        for j in range(len(tables[i][3])):
+            for code in codes:
+                if tables[i][j][0] == code:
+                    flag = subjectCode.index(code)
+                    c.iloc[index, 3 + flag * 6] = tables[i][j][3]
+                    c.iloc[index, 4 + flag * 6] = tables[i][j][5]
+                    c.iloc[index, 5 + flag * 6] = tables[i][j][7]
+                    c.iloc[index, 6 + flag * 6] = tables[i][j][9]
+                    c.iloc[index, 7 + flag * 6] = tables[i][j][12]
+                    c.iloc[index, 8 + flag * 6] = tables[i][j][16]
+                    codes.remove(code)
+                    break
+        s = tables[i][len(tables[i]) - 2][0]
 
-            c.iloc[index, 21] = tables[i].iloc[9, 3]
-            c.iloc[index, 22] = tables[i].iloc[9, 5]
-            c.iloc[index, 23] = tables[i].iloc[9, 7]
-            c.iloc[index, 24] = tables[i].iloc[9, 9]
-            c.iloc[index, 25] = tables[i].iloc[9, 12]
-            c.iloc[index, 26] = tables[i].iloc[9, 16]
+        total_credit_match = re.search(r'Total Credit:\s*(\d+)', s)
+        total_credit_match2 = re.search(r'TotalCredit:(\d+)', s)
+        egp_match = re.search(r'EGP:\s*([\d.]+)', s)
+        sgpa_match = re.search(r'SGPA:\s*([\d.]+)', s)
+        status_match = re.search(r'Status:\s*([\w]+)', s)
 
-            c.iloc[index, 27] = tables[i].iloc[12, 3]
-            c.iloc[index, 28] = tables[i].iloc[12, 5]
-            c.iloc[index, 29] = tables[i].iloc[12, 7]
-            c.iloc[index, 30] = tables[i].iloc[12, 9]
-            c.iloc[index, 31] = tables[i].iloc[12, 12]
-            c.iloc[index, 32] = tables[i].iloc[12, 16]
+        total_credit = total_credit_match.group(1) if total_credit_match else total_credit_match2.group(1)
+        egp = egp_match.group(1) if egp_match else None
+        sgpa = sgpa_match.group(1) if sgpa_match else None
+        status = status_match.group(1) if status_match else None
 
-            c.iloc[index, 33] = tables[i].iloc[16, 3]
-            c.iloc[index, 34] = tables[i].iloc[16, 5]
-            c.iloc[index, 35] = tables[i].iloc[16, 7]
-            c.iloc[index, 36] = tables[i].iloc[16, 9]
-            c.iloc[index, 37] = tables[i].iloc[16, 12]
-            c.iloc[index, 38] = tables[i].iloc[16, 16]
+        c.at[index, 'Total Credit'] = total_credit
+        c.at[index, 'EGP'] = egp
+        c.at[index, 'SGPA'] = sgpa
+        c.at[index, 'Status'] = status
 
-            input_string = tables[i].iloc[17, 0]
-            total_credit_match = re.search(total_credit_pattern, input_string)
-            egp_match = re.search(egp_pattern, input_string)
-            sgpa_match = re.search(sgpa_pattern, input_string)
-            status_match = re.search(status_pattern, input_string)
-            total_credit = total_credit_match.group(1) if total_credit_match else ''
-            egp = egp_match.group(1) if egp_match else ''
-            sgpa = sgpa_match.group(1) if sgpa_match else ''
-            status = status_match.group(1) if status_match else ''
+        s = tables[i][len(tables[i]) - 1][0]
+        percentage_match = re.search(r'Percentage:\s*([\d.]+)\s*%', s)
+        percentage = percentage_match.group(1) if percentage_match else None
+        c.at[index, 'Percentage'] = percentage
 
-            c.iloc[index, 39] = total_credit
-            c.iloc[index, 40] = egp
-            c.iloc[index, 41] = sgpa
-            c.iloc[index, 42] = status
-
-            input_string = tables[i].iloc[18, 0]
-            percentage_match = re.search(percentage_pattern, input_string)
-            percentage = percentage_match.group(1) if percentage_match else ''
-            c.iloc[index, 43] = percentage
-            print(i)
-
-            index += 1
+        index += 1
 
     return c
