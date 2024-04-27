@@ -13,8 +13,8 @@ st.title("UPLOAD ENGINEERING RESULT PDF")
 
 try:
     pdf = st.file_uploader("UPLOAD A FILE")
-
     if pdf:
+        pdf2 = pdf.copy()
         tables = []
 
         with pdfplumber.open(pdf) as a:
@@ -25,7 +25,7 @@ try:
                 tables.extend(table)
 
         if tables != []:
-            data = processEnggResult.format2(pdf)
+            data = processEnggResult.format2(pdf2)
             a = data.to_csv().encode('utf-8')
             st.download_button("DOWNLOAD FILE", a, file_name="data.csv", mime="text/csv")
 
