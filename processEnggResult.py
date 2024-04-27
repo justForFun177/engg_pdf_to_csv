@@ -2,9 +2,6 @@
 import re
 import pandas as pd
 import PyPDF2
-from io import StringIO
-import io
-import tabula
 import pdfplumber
 
 def get_ese_marks(singlePage, sem: int, sub: int):
