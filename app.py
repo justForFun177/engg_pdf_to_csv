@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
+import copy
 from io import StringIO
 import io
-import copy
 import pdfplumber
 import processEnggResult
+import tabula
 import re
 import warnings
 
@@ -14,8 +15,8 @@ st.title("UPLOAD ENGINEERING RESULT PDF")
 
 try:
     pdf = st.file_uploader("UPLOAD A FILE")
+
     if pdf:
-        pdf2 = copy.copy(pdf)
         tables = []
 
         with pdfplumber.open(pdf) as a:
@@ -26,7 +27,7 @@ try:
                 tables.extend(table)
 
         if tables != []:
-            data = processEnggResult.format2(pdf2)
+            data = processEnggResult.format2(pdf)
             a = data.to_csv().encode('utf-8')
             st.download_button("DOWNLOAD FILE", a, file_name="data.csv", mime="text/csv")
 
@@ -174,4 +175,4 @@ try:
             except Exception as e:
                 st.error(e)
 except Exception as e:
-    st.error("PLEASE CHECK FORMAT OF GIVEN FILE!!!")
+    st.error(e)
