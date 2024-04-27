@@ -1,18 +1,22 @@
 import streamlit as st
 import pandas as pd
-import copy
 from io import StringIO
 import io
 import pdfplumber
 import processEnggResult
-import tabula
 import re
 import warnings
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, message=r"invalid escape sequence.*")
 st.set_page_config(page_title="PDF to EXCEL")
 st.title("UPLOAD ENGINEERING RESULT PDF")
-
+try:
+    result = subprocess.run(['nvidia-smi', '--query-gpu=index,name,utilization.gpu,memory.total,memory.used,memory.free', '--format=csv,noheader,nounits'], capture_output=True, text=True, check=True)
+    gpu_stats = result.stdout.strip().split('\n')
+    for stat in gpu_stats:
+        print(stat)
+except subprocess.CalledProcessError as e:
+     st.write(e)
 try:
     pdf = st.file_uploader("UPLOAD A FILE")
 
