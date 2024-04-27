@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import StringIO
 import io
+import copy
 import pdfplumber
 import processEnggResult
 import re
@@ -14,7 +15,7 @@ st.title("UPLOAD ENGINEERING RESULT PDF")
 try:
     pdf = st.file_uploader("UPLOAD A FILE")
     if pdf:
-        pdf2 = pdf.copy()
+        pdf2 = copy.copy(pdf)
         tables = []
 
         with pdfplumber.open(pdf) as a:
